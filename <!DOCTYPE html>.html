@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML5 Game Layout</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #333;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        #game-container {
+            position: relative;
+            width: 90%;
+            max-width: 800px;
+            height: 450px; /* Fixed height for 16:9 aspect ratio */
+            background-color: #000;
+            border: 2px solid #fff;
+            overflow: hidden;
+        }
+
+        #background-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* This makes the image cover the container properly */
+            z-index: 1;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+
+        .character {
+            position: absolute;
+            width: 50px;
+            height: 100px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center bottom;
+            transition: transform 0.5s ease-out;
+            filter: drop-shadow(3px 3px 2px rgba(0, 0, 0, 0.7));
+            z-index: 3;
+        }
+
+        #player {
+            left: 10%;
+            bottom: 20%;
+            background-image: url('player-sprite.png');
+        }
+
+        #enemy {
+            right: 10%;
+            bottom: 20%;
+            background-image: url('enemy-sprite.png');
+        }
+
+        .health-bar-container {
+            position: absolute;
+            width: 120px;
+            height: 20px;
+            border: 4px solid #000;
+            box-shadow: 0 0 0 2px #fff;
+            padding: 2px;
+            background-color: #333;
+            z-index: 5;
+        }
+
+        .health-bar-label {
+            position: absolute;
+            font-size: 8px;
+            color: white;
+            text-shadow: 2px 2px 0 #000;
+            white-space: nowrap;
+            z-index: 5;
+        }
+
+        #player-health-label {
+            left: 10%;
+            top: 5%;
+        }
+
+        #enemy-health-label {
+            right: 10%;
+            top: 5%;
+            text-align: right;
+        }
+
+        .health-bar {
+            position: absolute;
+            width: 100%;
+            height: 10px;
+            background-color: #00cc00;
+            transition: width 0.5s ease, background-color 0.5s ease;
+        }
+
+        #player-health-container {
+            left: 10%;
+            top: 10%;
+        }
+
+        #enemy-health-container {
+            right: 10%;
+            top: 10%;
+        }
+
+        #level-indicator {
+            position: absolute;
+            top: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 10px;
+            text-shadow: 2px 2px 0 #000;
+            text-align: center;
+            z-index: 5;
+        }
+
+        #question-box {
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 600px;
+            background: #333;
+            padding: 15px;
+            border: 4px solid #000;
+            box-shadow: 0 0 0 2px #fff, 0 0 0 6px #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 5;
+        }
+
+        #current-question {
+            margin-bottom: 15px;
+            font-weight: bold;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        #answer-input-area {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        #question-box input {
+            flex: 1;
+            margin-right: 10px;
+            padding: 8px;
+            font-size: 12px;
+            font-family: 'Press Start 2P', cursive;
+            border: 2px solid #000;
+            background-color: #ddd;
+        }
+
+        #question-box button {
+            padding: 8px 12px;
+            font-size: 12px;
+            font-family: 'Press Start 2P', cursive;
+            cursor: pointer;
+            background-color: #777;
+            color: white;
+            border: 2px solid #000;
+            box-shadow: 2px 2px 0 #000;
+            transition: all 0.1s;
+        }
+
+        #question-box button:hover {
+            background-color: #999;
+        }
+
+        #question-box button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0 0 0 #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <img src="countryside.png" id="background-image" alt="Game Background">
+        <canvas id="game-canvas"></canvas>
+        <div id="player" class="character"></div>
+        <div id="enemy" class="character"></div>
+        
+        <div class="health-bar-label" id="player-health-label">PLAYER HP</div>
+        <div class="health-bar-container" id="player-health-container">
+            <div id="player-health" class="health-bar"></div>
+        </div>
+        
+        <div class="health-bar-label" id="enemy-health-label">ENEMY HP</div>
+        <div class="health-bar-container" id="enemy-health-container">
+            <div id="enemy-health" class="health-bar"></div>
+        </div>
+        
+        <div id="level-indicator">LEVEL 1: BEGINNER</div>
+        
+        <div id="question-box">
+            <div id="current-question"></div>
+            <div id="answer-input-area">
+                <input type="text" id="answer-input" placeholder="Type your answer here">
+                <button id="submit-btn">SUBMIT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const gameContainer = document.getElementById('game-container');
+        const playerHealth = document.getElementById('player-health');
+        const enemyHealth = document.getElementById('enemy-health');
+        const questionElement = document.getElementById('current-question');
+        const answerInput = document.getElementById('answer-input');
+        const submitButton = document.getElementById('submit-btn');
+        const levelIndicator = document.getElementById('level-indicator');
+
+        // Game questions and answers organized by difficulty level
+        const questions = {
+            beginner: [
+                { question: "What is the color of the sun?", answer: "yellow" },
+                { question: "How many days are in a week?", answer: "7" },
+                { question: "What is the opposite of 'big'?", answer: "small" },
+                { question: "What animal says 'meow'?", answer: "cat" },
+                { question: "What is 5 + 3?", answer: "8" },
+                { question: "What do you drink in the morning? (common answer)", answer: "coffee" },
+                { question: "What is the first day of the week?", answer: "monday" },
+                { question: "What is the capital of England?", answer: "london" },
+                { question: "How many legs does a spider have?", answer: "8" },
+                { question: "What is the color of snow?", answer: "white" }
+            ],
+            intermediate: [
+                { question: "What is the past tense of 'go'?", answer: "went" },
+                { question: "What is a synonym for 'happy'?", answer: "joyful" },
+                { question: "What do you call a baby dog?", answer: "puppy" },
+                { question: "What is the opposite of 'fast'?", answer: "slow" },
+                { question: "What is the capital of Brazil?", answer: "brasilia" },
+                { question: "What is 10 multiplied by 2?", answer: "20" },
+                { question: "What is the plural of 'child'?", answer: "children" },
+                { question: "What do you use to write on a blackboard?", answer: "chalk" },
+                { question: "What month comes after May?", answer: "june" },
+                { question: "What is the chemical symbol for gold?", answer: "au" }
+            ],
+            advanced: [
+                { question: "What is the past participle of 'drink'?", answer: "drunk" },
+                { question: "What does the idiom 'piece of cake' mean?", answer: "easy" },
+                { question: "What is the capital of Iceland?", answer: "reykjavik" },
+                { question: "What is a synonym for 'beautiful'?", answer: "gorgeous" },
+                { question: "What is the plural of 'mouse' (animal)?", answer: "mice" },
+                { question: "What gas do plants need to make food?", answer: "carbon dioxide" },
+                { question: "What is the opposite of 'generous'?", answer: "stingy" },
+                { question: "What is 15 divided by 3?", answer: "5" },
+                { question: "What is the longest river in the world?", answer: "nile" },
+                { question: "What tense is this sentence: 'I will go'?", answer: "future" }
+            ]
+        };
+
+        let currentEnemyLevel = 1; // Track the current enemy (1, 2, or 3)
+        let currentDifficulty = "beginner"; // Track the current difficulty level
+        let currentQuestionPool = [...questions.beginner]; // Copy the questions for the current difficulty
+        let usedQuestionIndices = []; // Track used question indices to avoid repetition
+        let enemyDefeated = false; // Track if the current enemy is defeated
+        let currentQuestionIndex = 0;
+        let playerHealthPercent = 100;
+        let enemyHealthPercent = 100;
+        let gameOver = false;
+
+        // Modified resize function to handle the canvas properly
+        function resizeCanvas() {
+            canvas.width = gameContainer.clientWidth;
+            canvas.height = gameContainer.clientHeight;
+            
+            // Clear canvas - we're using the img element for background now
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Initialize the game
+        function initGame() {
+            resizeCanvas();
+            resetGameForNewEnemy();
+            displayCurrentQuestion();
+            updateHealthBarColors();
+        }
+
+        // Reset game state for a new enemy
+        function resetGameForNewEnemy() {
+            // Reset enemy health
+            enemyHealthPercent = 100;
+            enemyHealth.style.width = "100%";
+            
+            // Update enemy sprite based on current level
+            const enemy = document.getElementById('enemy');
+            switch(currentEnemyLevel) {
+                case 1:
+                    currentDifficulty = "beginner";
+                    enemy.style.backgroundImage = "url('enemy-sprite.png')";
+                    levelIndicator.textContent = "LEVEL 1: BEGINNER";
+                    break;
+                case 2:
+                    currentDifficulty = "intermediate";
+                    enemy.style.backgroundImage = "url('enemy-sprite2.png')";
+                    levelIndicator.textContent = "LEVEL 2: INTERMEDIATE";
+                    break;
+                case 3:
+                    currentDifficulty = "advanced";
+                    enemy.style.backgroundImage = "url('enemy-sprite3.png')";
+                    levelIndicator.textContent = "LEVEL 3: ADVANCED";
+                    break;
+            }
+            
+            currentQuestionPool = [...questions[currentDifficulty]];
+            
+            // Get a random question to start
+            selectRandomQuestion();
+            updateHealthBarColors();
+        }
+        
+        // Update health bar colors based on health percentage
+        function updateHealthBarColors() {
+            // Player health bar color
+            if (playerHealthPercent > 50) {
+                playerHealth.style.backgroundColor = "#00cc00"; // Green
+            } else if (playerHealthPercent >= 20) {
+                playerHealth.style.backgroundColor = "#ffcc00"; // Yellow
+            } else {
+                playerHealth.style.backgroundColor = "#ff0000"; // Red
+            }
+            
+            // Enemy health bar color
+            if (enemyHealthPercent > 50) {
+                enemyHealth.style.backgroundColor = "#00cc00"; // Green
+            } else if (enemyHealthPercent >= 20) {
+                enemyHealth.style.backgroundColor = "#ffcc00"; // Yellow
+            } else {
+                enemyHealth.style.backgroundColor = "#ff0000"; // Red
+            }
+        }
+        
+        // Select a random question from the current pool
+        function selectRandomQuestion() {
+            // If all questions have been used, reset the used indices
+            if (usedQuestionIndices.length >= currentQuestionPool.length) {
+                usedQuestionIndices = [];
+            }
+            
+            // Find an unused question index
+            let randomIndex;
+            do {
+                randomIndex = Math.floor(Math.random() * currentQuestionPool.length);
+            } while (usedQuestionIndices.includes(randomIndex));
+            
+            // Add to used indices
+            usedQuestionIndices.push(randomIndex);
+            currentQuestionIndex = randomIndex;
+        }
+
+        // Display the current question
+        function displayCurrentQuestion() {
+            const currentQuestion = currentQuestionPool[currentQuestionIndex];
+            questionElement.textContent = currentQuestion.question;
+        }
+
+        // Check player's answer with animation
+        function checkAnswer() {
+            if (gameOver) return;
+
+            const userAnswer = answerInput.value.trim().toLowerCase();
+            const correctAnswer = currentQuestionPool[currentQuestionIndex].answer.toLowerCase();
+            const player = document.getElementById('player');
+            const enemy = document.getElementById('enemy');
+
+            // Disable input during animation
+            answerInput.disabled = true;
+            submitButton.disabled = true;
+
+            if (userAnswer === correctAnswer) {
+                // Correct answer - animate player attacking
+                const originalPosition = player.style.transform || '';
+                
+                // Move player toward the enemy
+                player.style.transform = 'translateX(150px)';
+                
+                // Set timeout to move player back and update health
+                setTimeout(() => {
+                    player.style.transform = originalPosition;
+                    
+                    // After animation, reduce enemy health
+                    setTimeout(() => {
+                        enemyHealthPercent -= 20;
+                        enemyHealth.style.width = enemyHealthPercent + "%";
+                        updateHealthBarColors();
+                        
+                        checkGameStatus();
+                        
+                        // Re-enable input if game is not over
+                        if (!gameOver && !enemyDefeated) {
+                            answerInput.disabled = false;
+                            submitButton.disabled = false;
+                            answerInput.focus();
+                        }
+                    }, 300);
+                }, 500);
+            } else {
+                // Incorrect answer - animate enemy attacking
+                const originalPosition = enemy.style.transform || '';
+                
+                // Move enemy toward the player
+                enemy.style.transform = 'translateX(-150px)';
+                
+                // Set timeout to move enemy back and update health
+                setTimeout(() => {
+                    enemy.style.transform = originalPosition;
+                    
+                    // After animation, reduce player health
+                    setTimeout(() => {
+                        playerHealthPercent -= 20;
+                        playerHealth.style.width = playerHealthPercent + "%";
+                        updateHealthBarColors();
+                        
+                        checkGameStatus();
+                        
+                        // Re-enable input if game is not over
+                        if (!gameOver && !enemyDefeated) {
+                            answerInput.disabled = false;
+                            submitButton.disabled = false;
+                            answerInput.focus();
+                        }
+                    }, 300);
+                }, 500);
+            }
+
+            // Clear input for next question
+            answerInput.value = '';
+        }
+
+        // Check if game is over and update to next question
+        function checkGameStatus() {
+            if (enemyHealthPercent <= 0) {
+                // Current enemy defeated
+                enemyDefeated = true;
+                
+                // Move to the next enemy if not on the final enemy
+                if (currentEnemyLevel < 3) {
+                    currentEnemyLevel++;
+                    
+                    const enemyNames = {
+                        1: "Beginner Enemy",
+                        2: "Intermediate Enemy",
+                        3: "Advanced Enemy"
+                    };
+                    
+                    setTimeout(() => {
+                        alert(`You defeated the ${enemyNames[currentEnemyLevel-1]}! Now facing the ${enemyNames[currentEnemyLevel]}!`);
+                        
+                        // Reset for the new enemy
+                        resetGameForNewEnemy();
+                        enemyDefeated = false;
+                        
+                        // Re-enable input for the new enemy
+                        answerInput.disabled = false;
+                        submitButton.disabled = false;
+                        answerInput.focus();
+                    }, 300);
+                } else {
+                    // Player has defeated all three enemies
+                    gameOver = true;
+                    setTimeout(() => {
+                        alert("Congratulations! You've defeated all enemies and won the game!");
+                        disableInput();
+                    }, 300);
+                }
+            } else if (playerHealthPercent <= 0) {
+                // Player has been defeated
+                gameOver = true;
+                setTimeout(() => {
+                    alert(`You were defeated by the ${currentEnemyLevel === 1 ? 'Beginner' : currentEnemyLevel === 2 ? 'Intermediate' : 'Advanced'} Enemy!`);
+                    disableInput();
+                }, 300);
+            } else if (!enemyDefeated) {
+                // Get the next random question
+                selectRandomQuestion();
+                displayCurrentQuestion();
+            }
+        }
+
+        // Disable input when game is over
+        function disableInput() {
+            answerInput.disabled = true;
+            submitButton.disabled = true;
+        }
+
+        // Event listeners
+        submitButton.addEventListener('click', checkAnswer);
+        answerInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Start the game when the page loads
+        window.addEventListener('load', initGame);
+    </script>
+</body>
+</html>
