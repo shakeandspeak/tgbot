@@ -1,0 +1,20 @@
+{
+  "name": "telegram-game",
+  "version": "1.0.0",
+  "description": "A Phaser-based HTML5 platformer game",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "phaser": "^3.88.2"
+  },
+  "devDependencies": {
+    "vite": "^6.2.3"
+  }
+}

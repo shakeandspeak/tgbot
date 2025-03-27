@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phaser Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #333;
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 450px;
+            overflow: hidden; /* Prevent elements from spilling outside */
+        }
+        /* Question box styling - adjusted for better positioning */
+        #question-box {
+            position: absolute;
+            bottom: 70px; /* Position higher in the game container */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%; /* Slightly smaller width */
+            max-width: 500px;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 15px;
+            border: 4px solid #fff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+            display: none; /* Initially hidden */
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000; /* Higher z-index to ensure it's on top */
+            pointer-events: auto; /* Ensure the box captures click events */
+        }
+        #current-question {
+            margin-bottom: 15px;
+            font-weight: bold;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        #answer-input-area {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+        }
+        #question-box input {
+            flex: 1;
+            margin-right: 10px;
+            padding: 10px;
+            font-size: 12px;
+            font-family: 'Press Start 2P', cursive;
+            border: 2px solid #fff;
+            background-color: #000;
+            color: #fff;
+        }
+        #question-box button {
+            padding: 10px 15px;
+            font-size: 12px;
+            font-family: 'Press Start 2P', cursive;
+            cursor: pointer;
+            background-color: #555;
+            color: white;
+            border: 2px solid #fff;
+            box-shadow: 2px 2px 0 #fff;
+            transition: all 0.1s;
+        }
+        #question-box button:hover {
+            background-color: #777;
+        }
+        #question-box button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0 0 0 #fff;
+        }
+        /* Responsive adjustments */
+        @media (max-height: 500px) {
+            #question-box {
+                bottom: 10px;
+                padding: 10px;
+            }
+            #current-question {
+                margin-bottom: 10px;
+                font-size: 10px;
+            }
+            #question-box input,
+            #question-box button {
+                padding: 5px;
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <!-- Phaser will create its canvas here -->
+    </div>
+    
+    <div id="question-box">
+        <div id="current-question"></div>
+        <div id="answer-input-area">
+            <input type="text" id="answer-input" placeholder="Type your answer here">
+            <button id="submit-btn">SUBMIT</button>
+        </div>
+    </div>
+    
+    <script type="module" src="game.js"></script>
+</body>
+</html>
