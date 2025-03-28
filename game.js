@@ -1,3 +1,4 @@
+// This line is correctly importing Phaser as an ES module
 import Phaser from 'phaser';
 
 // Game configuration with responsive scaling
@@ -141,6 +142,7 @@ function preload() {
     this.load.image('player', 'player-sprite.png');
     this.load.image('enemy', 'enemy-sprite.png');
     this.load.image('enemy-sprite2', 'enemy-sprite2.png');
+    this.load.image('enemy-sprite3', 'enemy-sprite3.png');
     
     // Immediately load questions file during preload phase
     this.load.text('questions', 'english_game_questions.txt');
@@ -690,6 +692,43 @@ function checkAnswer() {
     console.log("User answer:", userAnswer);
     console.log("Correct answer:", correctAnswer);
     
+    // Check for level skip cheat codes with new format "lvl1", "lvl2", "lvl3"
+    if (userAnswer === "lvl1" || userAnswer === "lvl2" || userAnswer === "lvl3") {
+        // Extract level number from the command
+        const targetLevel = parseInt(userAnswer.substring(3));
+        console.log(`CHEAT CODE ACTIVATED: Skipping to level ${targetLevel}`);
+        
+        // Hide enemy immediately
+        if (enemy) {
+            enemy.setVisible(false);
+        }
+        
+        // Hide question box
+        if (questionBox) {
+            questionBox.style.display = 'none';
+        }
+        
+        // Jump to the requested level
+        const scene = player.scene;
+        currentLevel = targetLevel; // Set directly to target level
+        
+        // Show level skip message
+        scene.add.text(scene.cameras.main.width / 2, scene.cameras.main.height / 2, `SKIPPING TO LEVEL ${targetLevel}`, {
+            fontSize: '24px',
+            fontFamily: '"Press Start 2P"',
+            fill: '#FF00FF', // Use a distinctive color for cheat messages
+            backgroundColor: '#000000',
+            padding: { left: 8, right: 8, top: 8, bottom: 8 }
+        }).setOrigin(0.5, 0.5).setDepth(1000);
+        
+        // Transition to the new level after a short delay
+        setTimeout(() => {
+            resetForNextEnemy(scene, true); // Pass true to indicate this is a cheat code
+        }, 1000);
+        
+        return; // Exit the function early
+    }
+    
     if (userAnswer === correctAnswer) {
         console.log("Correct!");
         // Prevent enemy health from going below 0
@@ -1069,12 +1108,13 @@ function playEnemyAttackAnimation() {
 }
 
 // Replace the resetForNextEnemy function with a simplified version
-function resetForNextEnemy(scene) {
-    console.log("===== LEVEL TRANSITION =====");
+function resetForNextEnemy(scene, isCheatCode = false) {
+    console.log(`===== LEVEL TRANSITION TO LEVEL ${currentLevel} =====`);
+    console.log(isCheatCode ? "Via cheat code" : "Normal progression");
     
-    // Clear victory message
+    // Clear victory message and any cheat code messages
     scene.children.each(child => {
-        if (child.type === 'Text' && child.text === 'VICTORY!') {
+        if (child.type === 'Text' && (child.text === 'VICTORY!' || child.text.includes('SKIPPING TO LEVEL'))) {
             child.destroy();
         }
     });
@@ -1093,7 +1133,7 @@ function resetForNextEnemy(scene) {
         {
             fontSize: '32px',
             fontFamily: '"Press Start 2P"',
-            fill: '#FFFF00'
+            fill: isCheatCode ? '#FF00FF' : '#FFFF00' // Use magenta for cheat codes
         }
     ).setOrigin(0.5, 0.5);
     
@@ -1116,9 +1156,32 @@ function resetForNextEnemy(scene) {
         const width = scene.scale.width;
         const height = scene.scale.height;
         
-        // Create a new enemy at the original position
-        enemy = scene.physics.add.sprite(width * 0.75, height * 0.75, currentLevel === 2 ? 'enemy-sprite2' : 'enemy-sprite');
-        enemy.setScale(0.35);
+        // Select the appropriate enemy sprite based on the current level
+        let enemySprite;
+        if (currentLevel === 2) {
+            enemySprite = 'enemy-sprite2';
+        } else if (currentLevel === 3) {
+            enemySprite = 'enemy-sprite3';
+        } else {
+            enemySprite = 'enemy-sprite';
+        }
+        
+        // Create a new enemy at the original position with the appropriate sprite
+        enemy = scene.physics.add.sprite(width * 0.75, height * 0.75, enemySprite);
+        
+        // Apply the correct scale and flip based on level
+        if (currentLevel === 2) {
+            // Make enemy-sprite2 15% bigger than before
+            enemy.setScale(0.174); // 0.151 * 1.15 = ~0.174
+            enemy.flipX = true;    // Mirror the enemy sprite horizontally
+        } else if (currentLevel === 3) {
+            // Make enemy-sprite3 bigger to match player size
+            enemy.setScale(0.35);  // Same scale as player (0.35 instead of 0.151)
+            enemy.flipX = true;    // Mirror the enemy sprite horizontally
+        } else {
+            enemy.setScale(0.35);  // Normal scale for level 1
+        }
+        
         enemy.setCollideWorldBounds(true);
         
         // Add physics colliders for the new enemy
@@ -1128,13 +1191,14 @@ function resetForNextEnemy(scene) {
         // Add breathing animation to the new enemy
         scene.breathingAnimationEnemy = scene.tweens.add({
             targets: enemy,
-            y: enemy.y - 2,
-            duration: 1600,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1,
-            delay: 800,
+            y: enemy.y - 2,                // Same as player (2 pixels)
+            duration: 1500,                // Same as player (1500ms) 
+            ease: 'Sine.easeInOut',        // Same ease function
+            yoyo: true,                    // Same yoyo effect
+            repeat: -1,                    // Infinite repetition
+            delay: currentLevel === 1 ? 800 : 0,  // No delay for level 2 and 3, only for level 1
             onStart: function() {
+                // Ensure physics don't interfere with the animation
                 enemy.body.allowGravity = false;
             },
             onComplete: function() {
@@ -1171,25 +1235,4 @@ function resetForNextEnemy(scene) {
             encounterEnemy(player, enemy);
         }, 500);
     }, 2000);
-}
-
-// Function to restart the game
-function restartGame(scene) {
-    console.log("Restarting game...");
-    
-    // Reset game variables
-    currentLevel = 1;
-    playerHealth = 100;
-    enemyHealth = 100;
-    currentLevelQuestions = questionTracker.selectFreshQuestions(currentLevel);
-    currentQuestion = currentLevelQuestions.length > 0 ? currentLevelQuestions[0] : { question: "What is the opposite of 'big'?", answer: "small" };
-    
-    // Clear all game objects
-    scene.children.each(child => child.destroy());
-    
-    // Recreate the game scene
-    create.call(scene);
-    
-    // Resume the game
-    gameActive = true;
 }
