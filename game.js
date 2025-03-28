@@ -1321,3 +1321,8 @@ function resetForNextEnemy(scene, isCheatCode = false) {
 
 // Expose the checkAnswer function to the global scope for GitHub Pages compatibility
 window.originalCheckAnswer = checkAnswer;
+
+window.onload = function () {
+    const initDataUnsafe = TelegramGameProxy.initParams; // optional, contains user info
+    console.log("Game started from Telegram", initDataUnsafe);
+};
