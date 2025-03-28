@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Phaser Game</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <!-- Подключаем Telegram Web App API -->
+    <!-- Include Telegram Web App API -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Add Phaser from CDN as fallback -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.88.2/dist/phaser.min.js"></script>
@@ -124,32 +124,41 @@
     </div>
     
     <script>
-        // Функция для инициализации Telegram Game
+        // Initialize Telegram Game
         window.gameInitCallback = function() {
             console.log("Game initialized via Telegram callback");
-            if (window.TelegramGameProxy) {
+            // First check for Telegram WebApp
+            if (window.Telegram && window.Telegram.WebApp) {
+                console.log("Telegram.WebApp detected:", window.Telegram.WebApp);
+                // Initialize with WebApp
+                window.gameParams = window.Telegram.WebApp.initParams || {};
+                console.log("Game params from WebApp:", window.gameParams);
+                // Notify Telegram the game is ready
+                window.Telegram.WebApp.ready();
+                console.log("Called Telegram.WebApp.ready()");
+            } 
+            // Then check for TelegramGameProxy (older method)
+            else if (window.TelegramGameProxy) {
                 console.log("TelegramGameProxy detected");
-                
-                // Сохраняем параметры инициализации
+                // Save initialization params
                 window.gameParams = window.TelegramGameProxy.initParams || {};
-                console.log("Game params:", window.gameParams);
-                
-                // Сообщаем Telegram, что игра загружена
+                console.log("Game params from GameProxy:", window.gameParams);
+                // Tell Telegram that the game is loaded
                 if (window.TelegramGameProxy.postEvent) {
                     window.TelegramGameProxy.postEvent("GAME_LOADED", {}, true);
                     console.log("Posted GAME_LOADED event to Telegram");
                 }
             } else {
-                console.log("TelegramGameProxy not detected, running in standalone mode");
+                console.log("Neither TelegramGameProxy nor Telegram.WebApp detected, running in standalone mode");
             }
         };
         
-        // Инициализация при загрузке
+        // Initialize on load
         document.addEventListener('DOMContentLoaded', function() {
-            // Запускаем инициализацию Telegram Game
+            // Run Telegram Game initialization
             window.gameInitCallback();
             
-            // Проверка на мобильное устройство для адаптации
+            // Check for mobile device for adaptation
             if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
                 console.log("Mobile device detected, adjusting layout");
                 document.body.classList.add('mobile-device');

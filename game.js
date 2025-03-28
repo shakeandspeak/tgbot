@@ -1,85 +1,158 @@
-// Этот код обрабатывает инициализацию в контексте Telegram Games
+// Handle Telegram game initialization
 window.onload = function() {
-    // Проверяем, запущена ли игра в контексте Telegram
-    if (window.TelegramGameProxy) {
+    console.log("Window loaded - checking for Telegram integration");
+    
+    // First check for Telegram WebApp API (newer method)
+    if (window.Telegram && window.Telegram.WebApp) {
+        console.log("Telegram WebApp detected!");
+        window.telegramParams = window.Telegram.WebApp.initData || {};
+        console.log("Game started with WebApp params:", window.telegramParams);
+        
+        // Tell Telegram the game is ready
+        window.Telegram.WebApp.ready();
+        console.log("Called Telegram.WebApp.ready()");
+        
+        // Expand viewport if needed
+        if (window.Telegram.WebApp.expand) {
+            window.Telegram.WebApp.expand();
+            console.log("Called Telegram.WebApp.expand()");
+        }
+    } 
+    // Fall back to TelegramGameProxy (older method)
+    else if (window.TelegramGameProxy) {
         console.log("Telegram Game Proxy detected!");
         window.telegramParams = window.TelegramGameProxy.initParams || {};
         console.log("Game started from Telegram with params:", window.telegramParams);
         
-        // Сообщаем Telegram что игра загружена
+        // Tell Telegram that game is loaded
         window.TelegramGameProxy.postEvent("GAME_LOADED", {}, true);
+        console.log("Posted GAME_LOADED event to Telegram");
     } else {
         console.log("Game is running in standalone mode (not in Telegram)");
     }
 };
 
-// Этот код правильно импортирует Phaser как ES модуль
+// Import Phaser as ES module
 import Phaser from 'phaser';
-
-// Добавляем консольный лог для отслеживания загрузки игрового модуля
+// Log game module loading for debugging
 console.log('Game module loaded! Phaser version:', Phaser.VERSION);
 
-// Функция для предзагрузки ресурсов с использованием конструктора Image и относительных путей
+// Optimized asset preloading using base paths that work in both standalone and Telegram modes
 function preloadAssets() {
-  console.log('Preloading assets with root-relative paths...');
+  console.log('Preloading assets...');
   
-  // Список всех изображений для предзагрузки
-  const imagesToLoad = [
-    '/countryside.png',
-    '/platform.png',
-    '/player-sprite.png',
-    '/enemy-sprite.png',
-    '/enemy-sprite2.png',
-    '/enemy-sprite3.png'
+  // Define possible base paths to try
+  const possiblePaths = ['/', '/public/', '', './public/', './'];
+  
+  // List of all images to preload
+  const imageNames = [
+    'countryside.png',
+    'platform.png',
+    'player-sprite.png',
+    'enemy-sprite.png',
+    'enemy-sprite2.png',
+    'enemy-sprite3.png'
   ];
   
-  // Создаем промис для каждой картинки для загрузки
-  const imagePromises = imagesToLoad.map(src => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        console.log(`Successfully loaded: ${src}`);
-        resolve(img);
-      };
-      img.onerror = () => {
-        console.error(`Failed to load: ${src}`);
-        // Разрешаем в любом случае, чтобы не блокировать игру
-        resolve(null);
-      };
-      img.src = src;
+  // Create a promise for each image using multiple possible paths
+  const imagePromises = imageNames.map(imageName => {
+    return new Promise((resolve) => {
+      let loadedSuccessfully = false;
+      let attemptCount = 0;
+      
+      // Try loading from each possible path
+      function tryNextPath() {
+        if (attemptCount >= possiblePaths.length || loadedSuccessfully) {
+          // We've tried all paths or already loaded successfully
+          resolve(loadedSuccessfully);
+          return;
+        }
+        
+        const path = possiblePaths[attemptCount];
+        const fullPath = path + imageName;
+        attemptCount++;
+        
+        const img = new Image();
+        img.onload = () => {
+          console.log(`Successfully loaded: ${fullPath}`);
+          loadedSuccessfully = true;
+          resolve(true);
+        };
+        
+        img.onerror = () => {
+          console.warn(`Failed to load from path: ${fullPath}`);
+          // Try the next path
+          tryNextPath();
+        };
+        
+        img.src = fullPath;
+      }
+      
+      // Start trying paths
+      tryNextPath();
     });
   });
   
-  // Также загружаем файл вопросов
-  const questionsPromise = fetch('/english_game_questions.txt')
-    .then(response => {
-      if (!response.ok) {
-        console.error('Failed to load questions file');
-        return null;
+  // Also load questions file with multiple possible paths
+  const questionsPromise = new Promise((resolve) => {
+    let loadedSuccessfully = false;
+    let attemptCount = 0;
+    
+    function tryNextPath() {
+      if (attemptCount >= possiblePaths.length || loadedSuccessfully) {
+        resolve(loadedSuccessfully ? window.preloadedQuestionsText : null);
+        return;
       }
-      console.log('Successfully loaded questions file');
-      return response.text();
-    })
-    .catch(error => {
-      console.error('Error loading questions file:', error);
-      return null;
-    });
+      
+      const path = possiblePaths[attemptCount];
+      const fullPath = path + 'english_game_questions.txt';
+      attemptCount++;
+      
+      fetch(fullPath)
+        .then(response => {
+          if (response.ok) {
+            console.log(`Successfully loaded questions from: ${fullPath}`);
+            return response.text();
+          }
+          throw new Error('Response not OK');
+        })
+        .then(text => {
+          window.preloadedQuestionsText = text;
+          loadedSuccessfully = true;
+          resolve(text);
+        })
+        .catch(() => {
+          console.warn(`Failed to load questions from: ${fullPath}`);
+          tryNextPath();
+        });
+    }
+    
+    // Start trying paths
+    tryNextPath();
+  });
   
-  // Возвращаем промис, который разрешается, когда все ресурсы загружены
+  // Return a promise that resolves when all assets are loaded
   return Promise.all([...imagePromises, questionsPromise])
     .then(results => {
-      // Последний результат - это текст вопросов
+      const allImagesLoaded = results.slice(0, imageNames.length).every(result => result);
       const questionsText = results[results.length - 1];
       
-      // Обрабатываем текст вопросов, если он доступен
-      if (questionsText) {
-        console.log('Questions text loaded, length:', questionsText.length);
-        // Сохраняем для дальнейшего использования
-        window.preloadedQuestionsText = questionsText;
+      if (allImagesLoaded) {
+        console.log('✅ All images loaded successfully');
+      } else {
+        console.warn('⚠️ Some images failed to load');
       }
       
-      console.log('All assets preloaded successfully');
-      return results;
+      if (questionsText) {
+        console.log('✅ Questions loaded successfully, length:', questionsText.length);
+      } else {
+        console.warn('⚠️ Failed to load questions');
+      }
+      
+      return {
+        imagesLoaded: allImagesLoaded,
+        questionsLoaded: !!questionsText
+      };
     });
 }
 

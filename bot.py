@@ -43,13 +43,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Логируем информацию о callback
         logger.info(f"Received callback query: {query.to_dict()}")
         
-        # Отвечаем на callback, чтобы убрать часы загрузки
-        await query.answer()
-        
         if query.game_short_name == GAME_SHORT_NAME:
             logger.info(f"User {query.from_user.id} ({query.from_user.username}) started the game")
             
-            # Отправляем URL игры в ответ на callback
+            # Отвечаем на callback с URL игры напрямую
+            # ВАЖНО: НЕ вызывать query.answer() до answer_callback_query, иначе игра не запустится
             await context.bot.answer_callback_query(
                 callback_query_id=query.id,
                 url=GAME_URL
@@ -57,6 +55,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"Sent game URL: {GAME_URL}")
         else:
             logger.warning(f"Unknown game short name: {query.game_short_name}")
+            await query.answer(text="Неизвестная игра")
     except Exception as e:
         logger.error(f"Error in button callback: {e}")
         await query.answer(text="Произошла ошибка при запуске игры")
