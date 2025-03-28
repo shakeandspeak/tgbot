@@ -1,14 +1,29 @@
-// This line is correctly importing Phaser as an ES module
+// Этот код обрабатывает инициализацию в контексте Telegram Games
+window.onload = function() {
+    // Проверяем, запущена ли игра в контексте Telegram
+    if (window.TelegramGameProxy) {
+        console.log("Telegram Game Proxy detected!");
+        window.telegramParams = window.TelegramGameProxy.initParams || {};
+        console.log("Game started from Telegram with params:", window.telegramParams);
+        
+        // Сообщаем Telegram что игра загружена
+        window.TelegramGameProxy.postEvent("GAME_LOADED", {}, true);
+    } else {
+        console.log("Game is running in standalone mode (not in Telegram)");
+    }
+};
+
+// Этот код правильно импортирует Phaser как ES модуль
 import Phaser from 'phaser';
 
-// Add a console log to track when the game module loads
+// Добавляем консольный лог для отслеживания загрузки игрового модуля
 console.log('Game module loaded! Phaser version:', Phaser.VERSION);
 
-// Function to preload assets using Image constructor and root-relative paths
+// Функция для предзагрузки ресурсов с использованием конструктора Image и относительных путей
 function preloadAssets() {
   console.log('Preloading assets with root-relative paths...');
   
-  // List of all image assets to preload
+  // Список всех изображений для предзагрузки
   const imagesToLoad = [
     '/countryside.png',
     '/platform.png',
@@ -18,7 +33,7 @@ function preloadAssets() {
     '/enemy-sprite3.png'
   ];
   
-  // Create a promise for each image to load
+  // Создаем промис для каждой картинки для загрузки
   const imagePromises = imagesToLoad.map(src => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -28,14 +43,14 @@ function preloadAssets() {
       };
       img.onerror = () => {
         console.error(`Failed to load: ${src}`);
-        // Resolve anyway to prevent blocking the game
+        // Разрешаем в любом случае, чтобы не блокировать игру
         resolve(null);
       };
       img.src = src;
     });
   });
   
-  // Also load the questions file
+  // Также загружаем файл вопросов
   const questionsPromise = fetch('/english_game_questions.txt')
     .then(response => {
       if (!response.ok) {
@@ -50,16 +65,16 @@ function preloadAssets() {
       return null;
     });
   
-  // Return a promise that resolves when all assets are loaded
+  // Возвращаем промис, который разрешается, когда все ресурсы загружены
   return Promise.all([...imagePromises, questionsPromise])
     .then(results => {
-      // The last result is the questions text
+      // Последний результат - это текст вопросов
       const questionsText = results[results.length - 1];
       
-      // Process questions text if available
+      // Обрабатываем текст вопросов, если он доступен
       if (questionsText) {
         console.log('Questions text loaded, length:', questionsText.length);
-        // Store for later use
+        // Сохраняем для дальнейшего использования
         window.preloadedQuestionsText = questionsText;
       }
       
@@ -68,7 +83,7 @@ function preloadAssets() {
     });
 }
 
-// Game configuration with responsive scaling
+// Конфигурация игры с адаптивным масштабированием
 const config = {
     type: Phaser.AUTO,
     width: 800,
@@ -92,25 +107,25 @@ const config = {
     }
 };
 
-// Initialize the game only after assets are preloaded
+// Инициализируем игру только после предзагрузки ресурсов
 let game;
 
-// Wait for DOM to be fully loaded before starting the game
+// Ждем полной загрузки DOM перед запуском игры
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM fully loaded, preloading assets before initializing game');
     
-    // First preload assets, then initialize the game
+    // Сначала предзагружаем ресурсы, затем инициализируем игру
     preloadAssets().then(() => {
         console.log('Assets preloaded, initializing game');
         game = new Phaser.Game(config);
     }).catch(error => {
         console.error('Error during asset preloading:', error);
-        // Initialize game anyway to show at least something
+        // Инициализируем игру в любом случае, чтобы показать хотя бы что-то
         game = new Phaser.Game(config);
     });
 });
 
-// Game variables
+// Игровые переменные
 let player;
 let enemy;
 let platforms;
@@ -128,46 +143,46 @@ let playerHealthText;
 let enemyHealthText;
 let levelText;
 let background;
-let allQuestions = null; // Will store all loaded questions
-let currentLevelQuestions = []; // Direct initialization with empty array instead of hardcoded questions
-let currentLevel = 1; // Track the current level
+let allQuestions = null; // Будет хранить все загруженные вопросы
+let currentLevelQuestions = []; // Прямое инициализация с пустым массивом вместо закодированных вопросов
+let currentLevel = 1; // Отслеживаем текущий уровень
 
-// Question tracking system to prevent repeats
+// Система отслеживания вопросов, чтобы предотвратить повторы
 const questionTracker = {
-    // Keep track of questions used in each level/difficulty
+    // Отслеживаем вопросы, использованные на каждом уровне/сложности
     usedQuestions: {
         beginner: new Set(),
         intermediate: new Set(),
         advanced: new Set()
     },
     
-    // Get difficulty name based on level
+    // Получаем имя сложности на основе уровня
     getDifficultyForLevel: function(level) {
         if (level === 1) return 'beginner';
         if (level === 2) return 'intermediate';
         return 'advanced';
     },
     
-    // Reset tracking for a specific difficulty
+    // Сбрасываем отслеживание для конкретной сложности
     resetTracking: function(difficulty) {
         this.usedQuestions[difficulty] = new Set();
         console.log(`Reset tracking for ${difficulty} questions`);
     },
     
-    // Mark a question as used
+    // Отмечаем вопрос как использованный
     markAsUsed: function(level, questionText) {
         const difficulty = this.getDifficultyForLevel(level);
         this.usedQuestions[difficulty].add(questionText);
         console.log(`Marked as used: [${difficulty}] "${questionText}"`);
     },
     
-    // Check if a question has been used
+    // Проверяем, был ли вопрос использован
     hasBeenUsed: function(level, questionText) {
         const difficulty = this.getDifficultyForLevel(level);
         return this.usedQuestions[difficulty].has(questionText);
     },
     
-    // Select fresh questions for a level
+    // Выбираем свежие вопросы для уровня
     selectFreshQuestions: function(level, count = 5) {
         if (!allQuestions) {
             console.error("Questions not loaded yet!");
@@ -177,27 +192,27 @@ const questionTracker = {
         const difficulty = this.getDifficultyForLevel(level);
         const allPoolQuestions = allQuestions[difficulty] || [];
         
-        // If we've used all or nearly all questions, reset tracking for this difficulty
+        // Если мы использовали все или почти все вопросы, сбрасываем отслеживание для этой сложности
         if (this.usedQuestions[difficulty].size >= allPoolQuestions.length - count) {
             this.resetTracking(difficulty);
         }
         
-        // Filter out questions that have been used
+        // Фильтруем вопросы, которые были использованы
         const availableQuestions = allPoolQuestions.filter(q => 
             !this.usedQuestions[difficulty].has(q.question)
         );
         
-        // If we somehow have fewer available questions than needed, reset and try again
+        // Если у нас каким-то образом меньше доступных вопросов, чем нужно, сбрасываем и пробуем снова
         if (availableQuestions.length < count) {
             this.resetTracking(difficulty);
             return this.selectFreshQuestions(level, count);
         }
         
-        // Shuffle and select count random questions
+        // Перемешиваем и выбираем count случайных вопросов
         const shuffled = [...availableQuestions].sort(() => 0.5 - Math.random());
         const selected = shuffled.slice(0, count);
         
-        // Mark these questions as used
+        // Отмечаем эти вопросы как использованные
         selected.forEach(q => this.markAsUsed(level, q.question));
         
         console.log(`Selected ${selected.length} fresh ${difficulty} questions for level ${level}`);
@@ -205,14 +220,14 @@ const questionTracker = {
     }
 };
 
-// Function to select 5 random questions for the current level
+// Функция для выбора 5 случайных вопросов для текущего уровня
 function selectQuestionsForLevel(level) {
-    // Use our new question tracker system to get fresh questions for each level
+    // Используем нашу новую систему отслеживания вопросов, чтобы получить свежие вопросы для каждого уровня
     return questionTracker.selectFreshQuestions(level);
 }
 
 function preload() {
-    // Load images with root-relative paths in Phaser
+    // Загружаем изображения с относительными путями в Phaser
     this.load.image('background', '/countryside.png');
     this.load.image('ground', '/platform.png');
     this.load.image('player', '/player-sprite.png');
@@ -220,7 +235,7 @@ function preload() {
     this.load.image('enemy-sprite2', '/enemy-sprite2.png');
     this.load.image('enemy-sprite3', '/enemy-sprite3.png');
     
-    // If questions were preloaded, use that data instead of loading again
+    // Если вопросы были предзагружены, используем эти данные вместо загрузки снова
     if (window.preloadedQuestionsText) {
         console.log("Using preloaded questions data");
         this.cache.text.add('questions', window.preloadedQuestionsText);
@@ -231,18 +246,18 @@ function preload() {
 }
 
 function create() {
-    // Calculate some values for responsive positioning
+    // Рассчитываем некоторые значения для адаптивного позиционирования
     const width = this.scale.width;
     const height = this.scale.height;
     const centerX = width / 2;
     const centerY = height / 2;
     
-    // Add background - positioned to fill the scene nicely
+    // Добавляем фон - позиционируем, чтобы он красиво заполнил сцену
     background = this.add.image(centerX, centerY, 'background');
     background.setDisplaySize(width, height);
     
-    // IMMEDIATELY PROCESS QUESTIONS FROM THE FILE that was loaded in preload
-    // This ensures we use questions from the file before any game interaction
+    // НЕМЕДЛЕННО ОБРАБАТЫВАЕМ ВОПРОСЫ ИЗ ФАЙЛА, который был загружен в preload
+    // Это гарантирует, что мы используем вопросы из файла перед любым взаимодействием с игрой
     const questionsText = this.cache.text.get('questions');
     if (questionsText) {
         console.log("FOUND QUESTIONS FILE IN CACHE, LENGTH:", questionsText.length);
@@ -251,34 +266,34 @@ function create() {
         console.error("ERROR: Could not find questions file in cache!");
     }
     
-    // Create platforms group with static physics - only for ground, removing floating platforms
+    // Создаем группу платформ со статической физикой - только для земли, убираем плавающие платформы
     platforms = this.physics.add.staticGroup();
     
-    // Create ground - positioned at bottom of screen
+    // Создаем землю - позиционируем внизу экрана
     platforms.create(centerX, height - 10, 'ground').setScale(width / 192, 1).refreshBody();
     
-    // Create player - scaled down to 70% of previous size (0.35 instead of 0.5)
+    // Создаем игрока - уменьшенного до 70% от предыдущего размера (0.35 вместо 0.5)
     player = this.physics.add.sprite(width * 0.25, height * 0.75, 'player');
     player.setScale(0.35);
     player.setBounce(0.2);
     player.setCollideWorldBounds(true);
-    player.flipX = true; // Mirror the player sprite horizontally
+    player.flipX = true; // Отзеркаливаем спрайт игрока по горизонтали
     
-    // Create enemy - scaled down to 70% of previous size (0.35 instead of 0.5)
+    // Создаем врага - уменьшенного до 70% от предыдущего размера (0.35 вместо 0.5)
     enemy = this.physics.add.sprite(width * 0.75, height * 0.75, 'enemy');
     enemy.setScale(0.35);
     enemy.setCollideWorldBounds(true);
     
-    // Add breathing animation to player and enemy - more subtle and smoother
+    // Добавляем анимацию дыхания игроку и врагу - более тонкая и плавная
     this.breathingAnimationPlayer = this.tweens.add({
         targets: player,
-        y: player.y - 2, // Reduced movement from 5 to 2 pixels for subtlety
-        duration: 1500, // Longer duration for smoother movement
+        y: player.y - 2, // Уменьшили движение с 5 до 2 пикселей для тонкости
+        duration: 1500, // Более длительный срок для более плавного движения
         ease: 'Sine.easeInOut',
         yoyo: true, 
         repeat: -1,
         onStart: function() {
-            // Ensure physics don't interfere with the animation
+            // Убедитесь, что физика не мешает анимации
             player.body.allowGravity = false;
         },
         onComplete: function() {
@@ -288,14 +303,14 @@ function create() {
     
     this.breathingAnimationEnemy = this.tweens.add({
         targets: enemy,
-        y: enemy.y - 2, // Reduced movement from 5 to 2 pixels for subtlety
-        duration: 1600, // Slightly different timing for variation
+        y: enemy.y - 2, // Уменьшили движение с 5 до 2 пикселей для тонкости
+        duration: 1600, // Немного другое время для вариации
         ease: 'Sine.easeInOut',
         yoyo: true,
         repeat: -1,
-        delay: 800, // More offset for less synchronization
+        delay: 800, // Больше смещения для меньшей синхронизации
         onStart: function() {
-            // Ensure physics don't interfere with the animation
+            // Убедитесь, что физика не мешает анимации
             enemy.body.allowGravity = false;
         },
         onComplete: function() {
@@ -303,79 +318,79 @@ function create() {
         }
     });
     
-    // Set up collisions
+    // Настраиваем столкновения
     this.physics.add.collider(player, platforms);
     this.physics.add.collider(enemy, platforms);
     
-    // Set up collision between player and enemy
+    // Настраиваем столкновение между игроком и врагом
     this.physics.add.overlap(player, enemy, encounterEnemy, null, this);
     
-    // Set up controls
+    // Настраиваем управление
     cursors = this.input.keyboard.createCursorKeys();
     
-    // Create UI elements - positioned relative to screen dimensions
-    // Player health bar (background)
+    // Создаем элементы интерфейса - позиционируем относительно размеров экрана
+    // Полоса здоровья игрока (фон)
     const playerHealthBg = this.add.rectangle(width * 0.15, 30, width * 0.25, 20, 0x000000);
     playerHealthBg.setOrigin(0, 0.5);
     playerHealthBg.setStrokeStyle(2, 0xFFFFFF);
     
-    // Player health bar (fill)
+    // Полоса здоровья игрока (заливка)
     playerHealthBar = this.add.rectangle(width * 0.15, 30, width * 0.25, 16, 0x00FF00);
     playerHealthBar.setOrigin(0, 0.5);
     
-    // Player health text
+    // Текст здоровья игрока
     playerHealthText = this.add.text(width * 0.15, 50, 'PLAYER: 100HP', {
         fontSize: '14px',
         fontFamily: '"Press Start 2P"',
         fill: '#FFFFFF'
     }).setOrigin(0, 0.5);
     
-    // Enemy health bar (background)
+    // Полоса здоровья врага (фон)
     const enemyHealthBg = this.add.rectangle(width * 0.85, 30, width * 0.25, 20, 0x000000);
     enemyHealthBg.setOrigin(1, 0.5);
     enemyHealthBg.setStrokeStyle(2, 0xFFFFFF);
     
-    // Enemy health bar (fill)
+    // Полоса здоровья врага (заливка)
     enemyHealthBar = this.add.rectangle(width * 0.85, 30, width * 0.25, 16, 0x00FF00);
     enemyHealthBar.setOrigin(1, 0.5);
     
-    // Enemy health text
+    // Текст здоровья врага
     enemyHealthText = this.add.text(width * 0.85, 50, 'ENEMY: 100HP', {
         fontSize: '14px',
         fontFamily: '"Press Start 2P"',
         fill: '#FFFFFF'
     }).setOrigin(1, 0.5);
     
-    // Level text
+    // Текст уровня
     levelText = this.add.text(centerX, 30, 'LEVEL 1', {
         fontSize: '18px',
         fontFamily: '"Press Start 2P"',
         fill: '#FFFFFF'
     }).setOrigin(0.5, 0.5);
     
-    // Get reference to the HTML question box and input elements
+    // Получаем ссылку на HTML элемент вопроса и элементы ввода
     questionBox = document.getElementById('question-box');
     answerInput = document.getElementById('answer-input');
     submitBtn = document.getElementById('submit-btn');
     
-    // Debug - log if elements were found
+    // Отладка - логируем, если элементы были найдены
     console.log('Question box found:', questionBox ? 'YES' : 'NO');
     console.log('Answer input found:', answerInput ? 'YES' : 'NO');
     console.log('Submit button found:', submitBtn ? 'YES' : 'NO');
     
-    // Set up event listeners for the question box
+    // Настраиваем обработчики событий для вопросительного бокса
     setupQuestionBoxEvents();
     
-    // Make sure the game responds to window resize events
+    // Убедитесь, что игра реагирует на события изменения размера окна
     this.scale.on('resize', this.handleResize, this);
     
-    // Initial default question - will be replaced when questions load
+    // Начальный вопрос по умолчанию - будет заменен, когда вопросы загрузятся
     currentQuestion = { 
         question: "What is the opposite of 'big'?", 
         answer: "small" 
     };
     
-    // Set up initial questions for level 1
+    // Настраиваем начальные вопросы для уровня 1
     if (allQuestions && allQuestions.beginner && allQuestions.beginner.length > 0) {
         console.log("Using questions from file for the game start!");
         currentLevelQuestions = questionTracker.selectFreshQuestions(currentLevel);
@@ -386,7 +401,7 @@ function create() {
     } else {
         console.error("ERROR: Questions not loaded correctly at game start!");
         
-        // Fallback to a single default question if loading failed
+        // Резервный вариант - один вопрос по умолчанию, если загрузка не удалась
         currentLevelQuestions = [
             { question: "What is the opposite of 'big'?", answer: "small" }
         ];
@@ -394,16 +409,16 @@ function create() {
     }
 }
 
-// Parse questions directly from text content
+// Парсим вопросы напрямую из текстового содержимого
 function parseQuestionsDirectly(questionsText) {
     console.log("*** DIRECTLY PARSING QUESTIONS FROM TEXT ***");
     console.log("Text length:", questionsText.length);
     
-    // Parse the questions file
+    // Парсим файл вопросов
     const lines = questionsText.split('\n');
     console.log(`File contains ${lines.length} lines`);
     
-    // Initialize our questions object
+    // Инициализируем наш объект вопросов
     allQuestions = {
         beginner: [],
         intermediate: [],
@@ -412,12 +427,12 @@ function parseQuestionsDirectly(questionsText) {
     
     let currentDifficulty = '';
     
-    // Process each line
+    // Обрабатываем каждую строку
     for (const line of lines) {
         const trimmedLine = line.trim();
         if (trimmedLine === '') continue;
         
-        // Check if this is a difficulty header
+        // Проверяем, является ли это заголовком сложности
         if (trimmedLine === 'BEGINNER') {
             currentDifficulty = 'beginner'; 
             console.log("Found BEGINNER section");
@@ -432,7 +447,7 @@ function parseQuestionsDirectly(questionsText) {
             continue;
         }
         
-        // Parse question and answer
+        // Парсим вопрос и ответ
         const parts = line.split('|');
         if (parts.length >= 2) {
             const question = parts[0].trim();
@@ -444,12 +459,12 @@ function parseQuestionsDirectly(questionsText) {
         }
     }
     
-    // Log the results
+    // Логируем результаты
     console.log(`Loaded ${allQuestions.beginner.length} beginner questions`);
     console.log(`Loaded ${allQuestions.intermediate.length} intermediate questions`);
     console.log(`Loaded ${allQuestions.advanced.length} advanced questions`);
     
-    // Dump a few sample questions to console to verify loading
+    // Выводим несколько образцов вопросов в консоль, чтобы проверить загрузку
     if (allQuestions.beginner.length > 0) {
         console.log("SAMPLE BEGINNER QUESTIONS:");
         for (let i = 0; i < Math.min(3, allQuestions.beginner.length); i++) {
@@ -457,21 +472,21 @@ function parseQuestionsDirectly(questionsText) {
         }
     }
     
-    // Select fresh questions for the current level immediately
+    // Немедленно выбираем свежие вопросы для текущего уровня
     if (allQuestions.beginner.length > 0) {
-        // Reset the question tracker first
+        // Сначала сбрасываем отслеживатель вопросов
         questionTracker.resetTracking('beginner');
         questionTracker.resetTracking('intermediate');
         questionTracker.resetTracking('advanced');
         
-        // Select fresh questions for the current level
+        // Выбираем свежие вопросы для текущего уровня
         currentLevelQuestions = questionTracker.selectFreshQuestions(currentLevel);
         console.log("SELECTED QUESTIONS FOR LEVEL:", currentLevel);
         currentLevelQuestions.forEach((q, i) => {
             console.log(`${i+1}. "${q.question}" (Answer: "${q.answer}")`);
         });
         
-        // Update the current question
+        // Обновляем текущий вопрос
         if (currentLevelQuestions.length > 0) {
             currentQuestion = currentLevelQuestions[0];
             console.log("SET CURRENT QUESTION TO:", currentQuestion.question);
@@ -481,46 +496,46 @@ function parseQuestionsDirectly(questionsText) {
     return allQuestions;
 }
 
-// Set up event listeners for the question box
+// Настраиваем обработчики событий для вопросительного бокса
 function setupQuestionBoxEvents() {
-    // Make sure question box is visible by default when debugging
+    // Убедитесь, что вопросительный бокс виден по умолчанию при отладке
     if (questionBox) {
-        // Set the current question text immediately
+        // Устанавливаем текст текущего вопроса немедленно
         const questionElement = document.getElementById('current-question');
         if (questionElement) {
             questionElement.textContent = currentQuestion.question;
             console.log('Set initial question text:', currentQuestion.question);
         }
         
-        // Show the question box
+        // Показываем вопросительный бокс
         questionBox.style.display = 'flex';
         console.log('Forced question box to display:flex');
     } else {
         console.log('WARNING: Could not find question-box element in the DOM');
     }
     
-    // Add event listener for the submit button
+    // Добавляем обработчик событий для кнопки отправки
     if (submitBtn) {
-        // Remove any existing listeners to avoid duplicates
+        // Убираем любые существующие обработчики, чтобы избежать дубликатов
         const newSubmitBtn = submitBtn.cloneNode(true);
         submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
         submitBtn = newSubmitBtn;
         
-        // Add the click event listener
+        // Добавляем обработчик события клика
         submitBtn.addEventListener('click', function() {
             console.log('Submit button clicked!');
             checkAnswer();
         });
     }
     
-    // Also check for Enter key press in the input field
+    // Также проверяем нажатие клавиши Enter в поле ввода
     if (answerInput) {
-        // Remove any existing listeners to avoid duplicates
+        // Убираем любые существующие обработчики, чтобы избежать дубликатов
         const newAnswerInput = answerInput.cloneNode(true);
         answerInput.parentNode.replaceChild(newAnswerInput, answerInput);
         answerInput = newAnswerInput;
         
-        // Add keypress event listener
+        // Добавляем обработчик события нажатия клавиши
         answerInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 console.log('Enter key pressed in input!');
@@ -529,7 +544,7 @@ function setupQuestionBoxEvents() {
         });
     }
     
-    // Force an encounter after a short delay to test question box
+    // Принудительно вызываем встречу после короткой задержки, чтобы протестировать вопросительный бокс
     setTimeout(function() {
         if (player && enemy) {
             encounterEnemy(player, enemy);
@@ -537,33 +552,33 @@ function setupQuestionBoxEvents() {
     }, 1000);
 }
 
-// Load questions asynchronously
+// Загружаем вопросы асинхронно
 async function loadQuestionsAsync(scene) {
     try {
         console.log("LOADING QUESTIONS FROM FILE...");
         allQuestions = await loadQuestionsFromFile();
         
-        // IMPORTANT: Once questions are loaded, immediately replace the default questions
-        // with random questions from the file
+        // ВАЖНО: Как только вопросы загружены, немедленно заменяем вопросы по умолчанию
+        // случайными вопросами из файла
         if (allQuestions) {
-            // Log the number of questions in each category
+            // Логируем количество вопросов в каждой категории
             console.log("QUESTIONS LOADED:");
             console.log(`- Beginner: ${allQuestions.beginner.length} questions`);
             console.log(`- Intermediate: ${allQuestions.intermediate.length} questions`);
             console.log(`- Advanced: ${allQuestions.advanced.length} questions`);
             
-            // Select 5 random questions for the current level using the question tracker
+            // Выбираем 5 случайных вопросов для текущего уровня с помощью отслеживателя вопросов
             currentLevelQuestions = questionTracker.selectFreshQuestions(currentLevel);
             console.log("Selected questions for current level:", 
                 currentLevelQuestions.map(q => q.question).join(", "));
             
-            // Set the current question to the first of the selected questions
+            // Устанавливаем текущий вопрос на первый из выбранных вопросов
             if (currentLevelQuestions.length > 0) {
                 currentQuestion = currentLevelQuestions[0];
                 console.log("CURRENT QUESTION SET TO:", currentQuestion.question);
             }
             
-            // Update the question display immediately
+            // Обновляем отображение вопроса немедленно
             const questionElement = document.getElementById('current-question');
             if (questionElement) {
                 questionElement.textContent = currentQuestion.question;
@@ -578,12 +593,12 @@ async function loadQuestionsAsync(scene) {
     }
 }
 
-// Load questions from file
+// Загружаем вопросы из файла
 async function loadQuestionsFromFile() {
     try {
         console.log("Starting to load questions from file...");
         
-        // Use fetch to load the questions file with an absolute path
+        // Используем fetch для загрузки файла вопросов с абсолютным путем
         const response = await fetch('english_game_questions.txt');
         if (!response.ok) {
             throw new Error(`Failed to load file: ${response.status} ${response.statusText}`);
@@ -592,7 +607,7 @@ async function loadQuestionsFromFile() {
         const text = await response.text();
         console.log("Raw file content length:", text.length);
         
-        // Parse the questions file
+        // Парсим файл вопросов
         const lines = text.split('\n');
         console.log(`File contains ${lines.length} lines`);
         
@@ -604,12 +619,12 @@ async function loadQuestionsFromFile() {
         
         let currentDifficulty = '';
         
-        // Process each line
+        // Обрабатываем каждую строку
         for (const line of lines) {
             const trimmedLine = line.trim();
             if (trimmedLine === '') continue;
             
-            // Check if this is a difficulty header
+            // Проверяем, является ли это заголовком сложности
             if (trimmedLine === 'BEGINNER') {
                 currentDifficulty = 'beginner';
                 console.log("Found BEGINNER section");
@@ -624,7 +639,7 @@ async function loadQuestionsFromFile() {
                 continue;
             }
             
-            // Parse question and answer
+            // Парсим вопрос и ответ
             const parts = line.split('|');
             if (parts.length >= 2) {
                 const question = parts[0].trim();
@@ -636,12 +651,12 @@ async function loadQuestionsFromFile() {
             }
         }
         
-        // Log the results
+        // Логируем результаты
         console.log(`Loaded ${questions.beginner.length} beginner questions`);
         console.log(`Loaded ${questions.intermediate.length} intermediate questions`);
         console.log(`Loaded ${questions.advanced.length} advanced questions`);
         
-        // Log the first few questions from each category to verify
+        // Логируем первые несколько вопросов из каждой категории, чтобы проверить
         if (questions.beginner.length > 0) {
             console.log("First beginner question:", questions.beginner[0]);
         }
@@ -657,7 +672,7 @@ async function loadQuestionsFromFile() {
         console.error('Error loading questions file:', error);
         alert('Failed to load questions file! Using default questions instead.');
         
-        // Return default questions as fallback
+        // Возвращаем вопросы по умолчанию в качестве резервного варианта
         return {
             beginner: [
                 { question: "What is the opposite of 'big'?", answer: "small" },
@@ -693,7 +708,7 @@ async function loadQuestionsFromFile() {
     }
 }
 
-// Handle resize events to reposition elements
+// Обрабатываем события изменения размера, чтобы изменить позицию элементов
 function handleResize(gameSize) {
     const width = gameSize.width;
     const height = gameSize.height;
@@ -703,13 +718,13 @@ function handleResize(gameSize) {
         background.setDisplaySize(width, height);
     }
     
-    // Reposition other elements as needed...
+    // Перемещаем другие элементы по мере необходимости...
 }
 
 function update() {
     if (!gameActive) return;
 
-    // Handle player movement
+    // Обрабатываем движение игрока
     if (cursors.left.isDown) {
         player.setVelocityX(-160);
     } else if (cursors.right.isDown) {
@@ -718,19 +733,19 @@ function update() {
         player.setVelocityX(0);
     }
 
-    // Handle jumping
+    // Обрабатываем прыжки
     if (cursors.up.isDown && player.body.touching.down) {
         player.setVelocityY(-330);
     }
 }
 
 function encounterEnemy(player, enemy) {
-    // Pause the game
+    // Приостанавливаем игру
     gameActive = false;
     player.setVelocity(0, 0);
     enemy.setVelocity(0, 0);
     
-    // Set a default question if none exists
+    // Устанавливаем вопрос по умолчанию, если его нет
     if (!currentQuestion || !currentQuestion.question) {
         currentQuestion = { 
             question: "What is the opposite of 'big'?", 
@@ -738,109 +753,109 @@ function encounterEnemy(player, enemy) {
         };
     }
     
-    // Show question and question box
+    // Показываем вопрос и вопросительный бокс
     if (questionBox) {
-        // Set the current question text
+        // Устанавливаем текст текущего вопроса
         const questionElement = document.getElementById('current-question');
         if (questionElement) {
-            // Set question text with a default fallback
+            // Устанавливаем текст вопроса с резервным вариантом по умолчанию
             questionElement.textContent = currentQuestion.question || "What is the opposite of 'big'?";
             console.log("Set question text:", questionElement.textContent);
         } else {
             console.log("ERROR: Could not find question element");
         }
         
-        // Show the question box
+        // Показываем вопросительный бокс
         questionBox.style.display = 'flex';
         
-        // Focus on the answer input
+        // Фокусируемся на поле ввода ответа
         if (answerInput) {
             answerInput.value = '';
-            setTimeout(() => answerInput.focus(), 100); // Delay focus to ensure the box is visible
+            setTimeout(() => answerInput.focus(), 100); // Задержка фокуса, чтобы убедиться, что бокс виден
         }
     } else {
         console.log("ERROR: Question box not found");
     }
 }
 
-// Function to check player's answer and handle game logic
+// Функция для проверки ответа игрока и обработки логики игры
 function checkAnswer() {
     console.log("checkAnswer called, gameActive:", gameActive);
     
-    // Get the user's answer and the correct answer
+    // Получаем ответ пользователя и правильный ответ
     const userAnswer = answerInput ? answerInput.value.trim().toLowerCase() : '';
     const correctAnswer = currentQuestion.answer.toLowerCase();
     
     console.log("User answer:", userAnswer);
     console.log("Correct answer:", correctAnswer);
     
-    // Check for level skip cheat codes with new format "lvl1", "lvl2", "lvl3"
+    // Проверяем коды читов для пропуска уровня с новым форматом "lvl1", "lvl2", "lvl3"
     if (userAnswer === "lvl1" || userAnswer === "lvl2" || userAnswer === "lvl3") {
-        // Extract level number from the command
+        // Извлекаем номер уровня из команды
         const targetLevel = parseInt(userAnswer.substring(3));
         console.log(`CHEAT CODE ACTIVATED: Skipping to level ${targetLevel}`);
         
-        // Hide enemy immediately
+        // Скрываем врага немедленно
         if (enemy) {
             enemy.setVisible(false);
         }
         
-        // Hide question box
+        // Скрываем вопросительный бокс
         if (questionBox) {
             questionBox.style.display = 'none';
         }
         
-        // Jump to the requested level
+        // Переходим к запрашиваемому уровню
         const scene = player.scene;
-        currentLevel = targetLevel; // Set directly to target level
+        currentLevel = targetLevel; // Устанавливаем напрямую на целевой уровень
         
-        // Show level skip message
+        // Показываем сообщение о пропуске уровня
         scene.add.text(scene.cameras.main.width / 2, scene.cameras.main.height / 2, `SKIPPING TO LEVEL ${targetLevel}`, {
             fontSize: '24px',
             fontFamily: '"Press Start 2P"',
-            fill: '#FF00FF', // Use a distinctive color for cheat messages
+            fill: '#FF00FF', // Используем отличительный цвет для сообщений читов
             backgroundColor: '#000000',
             padding: { left: 8, right: 8, top: 8, bottom: 8 }
         }).setOrigin(0.5, 0.5).setDepth(1000);
         
-        // Transition to the new level after a short delay
+        // Переход к новому уровню после короткой задержки
         setTimeout(() => {
-            resetForNextEnemy(scene, true); // Pass true to indicate this is a cheat code
+            resetForNextEnemy(scene, true); // Передаем true, чтобы указать, что это код читов
         }, 1000);
         
-        return; // Exit the function early
+        return; // Выходим из функции раньше
     }
     
     if (userAnswer === correctAnswer) {
         console.log("Correct!");
-        // Prevent enemy health from going below 0
+        // Предотвращаем снижение здоровья врага ниже 0
         enemyHealth = Math.max(0, enemyHealth - 20);
         console.log(`Enemy health: ${enemyHealth}`);
         
-        // Update enemy health bar and text
+        // Обновляем полосу здоровья врага и текст
         updateEnemyHealthDisplay();
         
-        // Play attack animation in a requestAnimationFrame to ensure it's visible
+        // Проигрываем анимацию атаки в requestAnimationFrame, чтобы убедиться, что она видима
         requestAnimationFrame(() => {
             playAttackAnimation();
         });
         
-        // Check if enemy is defeated
+        // Проверяем, побежден ли враг
         if (enemyHealth <= 0) {
             console.log("Enemy defeated!");
             
-            // Instead of changing to enemy-sprite3, make the enemy invisible immediately
+            // Вместо смены на enemy-sprite3, делаем врага невидимым немедленно
             if (enemy) {
                 enemy.setVisible(false);
             }
             
-            // Hide question box after a delay
+            // Скрываем вопросительный бокс после задержки
             setTimeout(() => {
                 if (questionBox) {
                     questionBox.style.display = 'none';
                 }
                 
-                // Display victory message
+                // Показываем сообщение о победе
                 const scene = player.scene;
                 scene.add.text(scene.cameras.main.width / 2, scene.cameras.main.height / 2, 'VICTORY!', {
                     fontSize: '32px',
@@ -848,38 +863,38 @@ function checkAnswer() {
                     fill: '#FFFFFF'
                 }).setOrigin(0.5, 0.5);
                 
-                // Spawn new enemy after a delay with fresh questions for the next level
+                // Спавним нового врага после задержки с новыми вопросами для следующего уровня
                 setTimeout(() => {
-                    currentLevel++; // Increment level first
-                    resetForNextEnemy(scene); // Use the updated resetForNextEnemy function
+                    currentLevel++; // Сначала увеличиваем уровень
+                    resetForNextEnemy(scene); // Используем обновленную функцию resetForNextEnemy
                 }, 2000);
             }, 1500);
-            return; // Exit the function early
+            return; // Выходим из функции раньше
         }
     } else {
         console.log("Wrong!");
-        playerHealth = Math.max(0, playerHealth - 20); // Prevent negative health
+        playerHealth = Math.max(0, playerHealth - 20); // Предотвращаем отрицательное здоровье
         console.log(`Player health: ${playerHealth}`);
         
-        // Update player health bar and text
+        // Обновляем полосу здоровья игрока и текст
         updatePlayerHealthDisplay();
         
-        // Play enemy attack animation
+        // Проигрываем анимацию атаки врага
         requestAnimationFrame(() => {
             playEnemyAttackAnimation();
         });
         
-        // Check if player lost
+        // Проверяем, проиграл ли игрок
         if (playerHealth <= 0) {
             console.log("Game over!");
             
-            // Hide question box for game over after a short delay
+            // Скрываем вопросительный бокс для окончания игры после короткой задержки
             setTimeout(() => {
                 if (questionBox) {
                     questionBox.style.display = 'none';
                 }
                 
-                // Display game over message
+                // Показываем сообщение о конце игры
                 const scene = player.scene;
                 const gameOverText = scene.add.text(scene.cameras.main.width / 2, scene.cameras.main.height / 2 - 40, 'GAME OVER', {
                     fontSize: '32px',
@@ -887,7 +902,7 @@ function checkAnswer() {
                     fill: '#FF0000'
                 }).setOrigin(0.5, 0.5);
                 
-                // Add "Try Again" button
+                // Добавляем кнопку "Попробовать снова"
                 const tryAgainButton = scene.add.text(scene.cameras.main.width / 2, scene.cameras.main.height / 2 + 40, 'TRY AGAIN', {
                     fontSize: '20px',
                     fontFamily: '"Press Start 2P"',
@@ -900,7 +915,7 @@ function checkAnswer() {
                 .on('pointerout', () => tryAgainButton.setStyle({ fill: '#FFFFFF' }))
                 .on('pointerdown', () => restartGame(scene));
                 
-                // Add a border around the button
+                // Добавляем рамку вокруг кнопки
                 const buttonBounds = tryAgainButton.getBounds();
                 const buttonBorder = scene.add.rectangle(
                     buttonBounds.centerX, 
@@ -911,13 +926,13 @@ function checkAnswer() {
                 ).setStrokeStyle(2, 0xFFFFFF);
             }, 1000);
             
-            // Reset game or show game over message
+            // Сбрасываем игру или показываем сообщение о конце игры
             gameActive = false;
-            return; // Exit the function early
+            return; // Выходим из функции раньше
         }
     }
     
-    // Get next question index (circular)
+    // Получаем индекс следующего вопроса (круговой)
     let nextQuestionIndex = 0;
     for (let i = 0; i < currentLevelQuestions.length; i++) {
         if (currentLevelQuestions[i].question === currentQuestion.question) {
@@ -926,60 +941,60 @@ function checkAnswer() {
         }
     }
     
-    // Set the next question
+    // Устанавливаем следующий вопрос
     currentQuestion = currentLevelQuestions[nextQuestionIndex];
     
-    // Set the new question text immediately on the DOM element
+    // Устанавливаем новый текст вопроса немедленно на элементе DOM
     const questionElement = document.getElementById('current-question');
     if (questionElement) {
         questionElement.textContent = currentQuestion.question;
         console.log("Set new question:", currentQuestion.question);
     }
     
-    // Reset input field but keep question box visible
+    // Сбрасываем поле ввода, но оставляем вопросительный бокс видимым
     if (answerInput) {
         answerInput.value = '';
-        answerInput.focus(); // Focus back on input for next question
+        answerInput.focus(); // Снова фокусируемся на вводе для следующего вопроса
     }
 }
 
-// Function to update the player health display
+// Функция для обновления отображения здоровья игрока
 function updatePlayerHealthDisplay() {
     const healthPercent = playerHealth / 100;
     playerHealthBar.width = 200 * healthPercent;
     playerHealthText.setText(`PLAYER: ${playerHealth}HP`);
     
-    // Change color based on health
+    // Меняем цвет в зависимости от здоровья
     if (healthPercent > 0.5) {
-        playerHealthBar.fillColor = 0x00FF00; // Green
+        playerHealthBar.fillColor = 0x00FF00; // Зеленый
     } else if (healthPercent > 0.25) {
-        playerHealthBar.fillColor = 0xFFFF00; // Yellow
+        playerHealthBar.fillColor = 0xFFFF00; // Желтый
     } else {
-        playerHealthBar.fillColor = 0xFF0000; // Red
+        playerHealthBar.fillColor = 0xFF0000; // Красный
     }
 }
 
-// Function to update the enemy health display
+// Функция для обновления отображения здоровья врага
 function updateEnemyHealthDisplay() {
     const healthPercent = enemyHealth / 100;
     enemyHealthBar.width = 200 * healthPercent;
     enemyHealthText.setText(`ENEMY: ${enemyHealth}HP`);
     
-    // Change color based on health
+    // Меняем цвет в зависимости от здоровья
     if (healthPercent > 0.5) {
-        enemyHealthBar.fillColor = 0x00FF00; // Green
+        enemyHealthBar.fillColor = 0x00FF00; // Зеленый
     } else if (healthPercent > 0.25) {
-        enemyHealthBar.fillColor = 0xFFFF00; // Yellow
+        enemyHealthBar.fillColor = 0xFFFF00; // Желтый
     } else {
-        enemyHealthBar.fillColor = 0xFF0000; // Red
+        enemyHealthBar.fillColor = 0xFF0000; // Красный
     }
 }
 
-// Function to play the attack animation when player answers correctly
+// Функция для проигрывания анимации атаки, когда игрок отвечает правильно
 function playAttackAnimation() {
     console.log("Playing attack animation...");
     
-    // Make sure we have valid player and enemy objects
+    // Убедитесь, что у нас есть действительные объекты игрока и врага
     if (!player || !player.scene || !enemy) {
         console.error("Cannot play animation - player or enemy not available");
         return;
@@ -987,45 +1002,45 @@ function playAttackAnimation() {
     
     const scene = player.scene;
     
-    // Store the original positions
+    // Сохраняем оригинальные позиции
     const originalPlayerX = player.x;
     const originalEnemyX = enemy.x;
     
-    // Calculate distances based on screen width
+    // Рассчитываем расстояния на основе ширины экрана
     const width = scene.scale.width;
-    const moveDistance = width * 0.25; // Even more dramatic movement (25% of screen width)
+    const moveDistance = width * 0.25; // Еще более драматическое движение (25% от ширины экрана)
     
     console.log("Animation starting with player at:", originalPlayerX, "moving distance:", moveDistance);
     
-    // Disable physics during animation to prevent collision interference
+    // Отключаем физику во время анимации, чтобы предотвратить помехи при столкновении
     player.body.enable = false;
     enemy.body.enable = false;
     
-    // Ensure game doesn't resume during animation
+    // Убедитесь, что игра не возобновляется во время анимации
     gameActive = false;
     
-    // Make player visually distinct during attack
-    player.setTint(0x00ffff); // Cyan tint for player during attack
+    // Делаем игрока визуально отличным во время атаки
+    player.setTint(0x00ffff); // Циановый оттенок для игрока во время атаки
     
-    // Using direct position updates instead of tweens for reliability
-    // 1. Move player toward enemy
+    // Используем прямые обновления позиции вместо tweens для надежности
+    // 1. Двигаем игрока к врагу
     player.x += moveDistance;
     
-    // 2. After a delay, move player back and trigger enemy effects
+    // 2. После задержки, двигаем игрока назад и запускаем эффекты врага
     setTimeout(() => {
-        // Move player back
+        // Двигаем игрока назад
         player.x = originalPlayerX;
         
-        // Add a yellow flash at enemy position
+        // Добавляем желтый всплеск в позиции врага
         const flashCircle = scene.add.circle(
             enemy.x, 
             enemy.y, 
-            60, // Large radius for visibility
-            0xffff00, // Yellow color
-            0.8 // High alpha for visibility
+            60, // Большой радиус для видимости
+            0xffff00, // Желтый цвет
+            0.8 // Высокая альфа для видимости
         );
         
-        // Scale and fade the flash
+        // Масштабируем и затухаем всплеск
         let scale = 1;
         let alpha = 0.8;
         const expandFlash = () => {
@@ -1042,30 +1057,30 @@ function playAttackAnimation() {
         };
         expandFlash();
         
-        // Make enemy flash red
+        // Делаем врага вспыхнуть красным
         enemy.setTint(0xff0000);
         
-        // Make enemy shake back and forth
+        // Делаем врага трястись взад-вперед
         let shakeCount = 0;
         const maxShakes = 5;
-        const shakeDistance = 20; // Larger for visibility
+        const shakeDistance = 20; // Больше для видимости
         
         const shakeEnemy = () => {
             if (shakeCount < maxShakes) {
-                // Move enemy left/right based on even/odd count
+                // Двигаем врага влево/вправо на основе четного/нечетного счета
                 enemy.x = originalEnemyX + (shakeCount % 2 === 0 ? -shakeDistance : shakeDistance);
                 shakeCount++;
                 setTimeout(shakeEnemy, 80);
             } else {
-                // Reset enemy position when done
+                // Сбрасываем позицию врага, когда все сделано
                 enemy.x = originalEnemyX;
                 
-                // Reset tints and enable physics after animation completes
+                // Сбрасываем оттенки и включаем физику после завершения анимации
                 setTimeout(() => {
                     enemy.clearTint();
                     player.clearTint();
                     
-                    // Re-enable physics
+                    // Включаем физику снова
                     player.body.enable = true;
                     enemy.body.enable = true;
                     
@@ -1074,19 +1089,19 @@ function playAttackAnimation() {
             }
         };
         
-        // Start enemy shaking
+        // Начинаем трясти врага
         shakeEnemy();
         
-    }, 250); // Wait before moving back
+    }, 250); // Ждем перед движением назад
     
     console.log("Animation sequence started with direct position updates");
 }
 
-// Function to play the attack animation when player answers incorrectly
+// Функция для проигрывания анимации атаки, когда игрок отвечает неправильно
 function playEnemyAttackAnimation() {
     console.log("Playing enemy attack animation...");
     
-    // Make sure we have valid player and enemy objects
+    // Убедитесь, что у нас есть действительные объекты игрока и врага
     if (!player || !player.scene || !enemy) {
         console.error("Cannot play animation - player or enemy not available");
         return;
@@ -1094,45 +1109,45 @@ function playEnemyAttackAnimation() {
     
     const scene = player.scene;
     
-    // Store the original positions
+    // Сохраняем оригинальные позиции
     const originalPlayerX = player.x;
     const originalEnemyX = enemy.x;
     
-    // Calculate distances based on screen width
+    // Рассчитываем расстояния на основе ширины экрана
     const width = scene.scale.width;
-    const moveDistance = width * 0.25; // Even more dramatic movement (25% of screen width)
+    const moveDistance = width * 0.25; // Еще более драматическое движение (25% от ширины экрана)
     
     console.log("Animation starting with enemy at:", originalEnemyX, "moving distance:", moveDistance);
     
-    // Disable physics during animation to prevent collision interference
+    // Отключаем физику во время анимации, чтобы предотвратить помехи при столкновении
     player.body.enable = false;
     enemy.body.enable = false;
     
-    // Ensure game doesn't resume during animation
+    // Убедитесь, что игра не возобновляется во время анимации
     gameActive = false;
     
-    // Make enemy visually distinct during attack
-    enemy.setTint(0xff0000); // Red tint for enemy during attack
+    // Делаем врага визуально отличным во время атаки
+    enemy.setTint(0xff0000); // Красный оттенок для врага во время атаки
     
-    // Using direct position updates instead of tweens for reliability
-    // 1. Move enemy toward player
+    // Используем прямые обновления позиции вместо tweens для надежности
+    // 1. Двигаем врага к игроку
     enemy.x -= moveDistance;
     
-    // 2. After a delay, move enemy back and trigger player effects
+    // 2. После задержки, двигаем врага назад и запускаем эффекты игрока
     setTimeout(() => {
-        // Move enemy back
+        // Двигаем врага назад
         enemy.x = originalEnemyX;
         
-        // Add a red flash at player position
+        // Добавляем красный всплеск в позиции игрока
         const flashCircle = scene.add.circle(
             player.x, 
             player.y, 
-            60, // Large radius for visibility
-            0xff0000, // Red color
-            0.8 // High alpha for visibility
+            60, // Большой радиус для видимости
+            0xff0000, // Красный цвет
+            0.8 // Высокая альфа для видимости
         );
         
-        // Scale and fade the flash
+        // Масштабируем и затухаем всплеск
         let scale = 1;
         let alpha = 0.8;
         const expandFlash = () => {
@@ -1149,30 +1164,30 @@ function playEnemyAttackAnimation() {
         };
         expandFlash();
         
-        // Make player flash cyan
+        // Делаем игрока вспыхнуть цианом
         player.setTint(0x00ffff);
         
-        // Make player shake back and forth
+        // Делаем игрока трястись взад-вперед
         let shakeCount = 0;
         const maxShakes = 5;
-        const shakeDistance = 20; // Larger for visibility
+        const shakeDistance = 20; // Больше для видимости
         
         const shakePlayer = () => {
             if (shakeCount < maxShakes) {
-                // Move player left/right based on even/odd count
+                // Двигаем игрока влево/вправо на основе четного/нечетного счета
                 player.x = originalPlayerX + (shakeCount % 2 === 0 ? -shakeDistance : shakeDistance);
                 shakeCount++;
                 setTimeout(shakePlayer, 80);
             } else {
-                // Reset player position when done
+                // Сбрасываем позицию игрока, когда все сделано
                 player.x = originalPlayerX;
                 
-                // Reset tints and enable physics after animation completes
+                // Сбрасываем оттенки и включаем физику после завершения анимации
                 setTimeout(() => {
                     player.clearTint();
                     enemy.clearTint();
                     
-                    // Re-enable physics
+                    // Включаем физику снова
                     player.body.enable = true;
                     enemy.body.enable = true;
                     
@@ -1181,33 +1196,33 @@ function playEnemyAttackAnimation() {
             }
         };
         
-        // Start player shaking
+        // Начинаем трясти игрока
         shakePlayer();
         
-    }, 250); // Wait before moving back
+    }, 250); // Ждем перед движением назад
     
     console.log("Animation sequence started with direct position updates");
 }
 
-// Replace the resetForNextEnemy function with a simplified version
+// Заменяем функцию resetForNextEnemy на упрощенную версию
 function resetForNextEnemy(scene, isCheatCode = false) {
     console.log(`===== LEVEL TRANSITION TO LEVEL ${currentLevel} =====`);
     console.log(isCheatCode ? "Via cheat code" : "Normal progression");
     
-    // Clear victory message and any cheat code messages
+    // Очищаем сообщение о победе и любые сообщения чит-кодов
     scene.children.each(child => {
         if (child.type === 'Text' && (child.text === 'VICTORY!' || child.text.includes('SKIPPING TO LEVEL'))) {
             child.destroy();
         }
     });
     
-    // Update level text
+    // Обновляем текст уровня
     levelText.setText(`LEVEL ${currentLevel}`);
     
-    // Reset enemy health
+    // Сбрасываем здоровье врага
     enemyHealth = 100;
     
-    // Show level transition message
+    // Показываем сообщение о переходе уровня
     const levelUpText = scene.add.text(
         scene.cameras.main.width / 2, 
         scene.cameras.main.height / 2, 
@@ -1215,13 +1230,13 @@ function resetForNextEnemy(scene, isCheatCode = false) {
         {
             fontSize: '32px',
             fontFamily: '"Press Start 2P"',
-            fill: isCheatCode ? '#FF00FF' : '#FFFF00' // Use magenta for cheat codes
+            fill: isCheatCode ? '#FF00FF' : '#FFFF00' // Используем пурпурный для чит-кодов
         }
     ).setOrigin(0.5, 0.5);
     
-    // After showing the level message, set up the next level
+    // После показа сообщения уровня, настраиваем следующий уровень
     setTimeout(() => {
-        // Fade out level message
+        // Затухаем сообщение уровня
         scene.tweens.add({
             targets: levelUpText,
             alpha: 0,
@@ -1229,16 +1244,16 @@ function resetForNextEnemy(scene, isCheatCode = false) {
             onComplete: () => levelUpText.destroy()
         });
         
-        // Destroy the old enemy before creating a new one
+        // Уничтожаем старого врага перед созданием нового
         if (enemy) {
             enemy.destroy();
         }
         
-        // Create a new enemy
+        // Создаем нового врага
         const width = scene.scale.width;
         const height = scene.scale.height;
         
-        // Select the appropriate enemy sprite based on the current level
+        // Выбираем соответствующий спрайт врага в зависимости от текущего уровня
         let enemySprite;
         if (currentLevel === 2) {
             enemySprite = 'enemy-sprite2';
@@ -1248,39 +1263,39 @@ function resetForNextEnemy(scene, isCheatCode = false) {
             enemySprite = 'enemy-sprite';
         }
         
-        // Create a new enemy at the original position with the appropriate sprite
+        // Создаем нового врага в оригинальной позиции с соответствующим спрайтом
         enemy = scene.physics.add.sprite(width * 0.75, height * 0.75, enemySprite);
         
-        // Apply the correct scale and flip based on level
+        // Применяем правильный масштаб и переворот в зависимости от уровня
         if (currentLevel === 2) {
-            // Make enemy-sprite2 15% bigger than before
+            // Делаем enemy-sprite2 на 15% больше, чем раньше
             enemy.setScale(0.174); // 0.151 * 1.15 = ~0.174
-            enemy.flipX = true;    // Mirror the enemy sprite horizontally
+            enemy.flipX = true;    // Отзеркаливаем спрайт врага по горизонтали
         } else if (currentLevel === 3) {
-            // Make enemy-sprite3 bigger to match player size
-            enemy.setScale(0.35);  // Same scale as player (0.35 instead of 0.151)
-            enemy.flipX = true;    // Mirror the enemy sprite horizontally
+            // Делаем enemy-sprite3 больше, чтобы соответствовать размеру игрока
+            enemy.setScale(0.35);  // Тот же масштаб, что и у игрока (0.35 вместо 0.151)
+            enemy.flipX = true;    // Отзеркаливаем спрайт врага по горизонтали
         } else {
-            enemy.setScale(0.35);  // Normal scale for level 1
+            enemy.setScale(0.35);  // Нормальный масштаб для уровня 1
         }
         
         enemy.setCollideWorldBounds(true);
         
-        // Add physics colliders for the new enemy
+        // Добавляем физические коллайдеры для нового врага
         scene.physics.add.collider(enemy, platforms);
         scene.physics.add.overlap(player, enemy, encounterEnemy, null, scene);
         
-        // Add breathing animation to the new enemy
+        // Добавляем анимацию дыхания для нового врага
         scene.breathingAnimationEnemy = scene.tweens.add({
             targets: enemy,
-            y: enemy.y - 2,                // Same as player (2 pixels)
-            duration: 1500,                // Same as player (1500ms) 
-            ease: 'Sine.easeInOut',        // Same ease function
-            yoyo: true,                    // Same yoyo effect
-            repeat: -1,                    // Infinite repetition
-            delay: currentLevel === 1 ? 800 : 0,  // No delay for level 2 and 3, only for level 1
+            y: enemy.y - 2,                // То же, что и у игрока (2 пикселя)
+            duration: 1500,                // То же, что и у игрока (1500ms) 
+            ease: 'Sine.easeInOut',        // То же самое ease функция
+            yoyo: true,                    // То же самое yoyo эффект
+            repeat: -1,                    // Бесконечное повторение
+            delay: currentLevel === 1 ? 800 : 0,  // Нет задержки для уровня 2 и 3, только для уровня 1
             onStart: function() {
-                // Ensure physics don't interfere with the animation
+                // Убедитесь, что физика не мешает анимации
                 enemy.body.allowGravity = false;
             },
             onComplete: function() {
@@ -1288,41 +1303,33 @@ function resetForNextEnemy(scene, isCheatCode = false) {
             }
         });
         
-        // IMPORTANT: Load new random questions for the new level
+        // ВАЖНО: Загружаем новые случайные вопросы для нового уровня
         currentLevelQuestions = questionTracker.selectFreshQuestions(currentLevel);
         console.log("Selected new questions for level " + currentLevel + ":", 
             currentLevelQuestions.map(q => q.question).join(", "));
         
-        // Set the first question for the new level
+        // Устанавливаем первый вопрос для нового уровня
         if (currentLevelQuestions.length > 0) {
             currentQuestion = currentLevelQuestions[0];
             
-            // Update the question display
+            // Обновляем отображение вопроса
             const questionElement = document.getElementById('current-question');
             if (questionElement) {
                 questionElement.textContent = currentQuestion.question;
             }
         }
         
-        // Update the health display
+        // Обновляем отображение здоровья
         updateEnemyHealthDisplay();
         
-        // Recreate UI elements to ensure button works
+        // Воссоздаем элементы интерфейса, чтобы убедиться, что кнопка работает
         setupQuestionBoxEvents();
         
-        // Resume game after everything is set up
+        // Возобновляем игру после того, как все настроено
         setTimeout(() => {
-            // Start encounter with new enemy
+            // Начинаем встречу с новым врагом
             gameActive = true;
             encounterEnemy(player, enemy);
         }, 500);
     }, 2000);
 }
-
-// Expose the checkAnswer function to the global scope for GitHub Pages compatibility
-window.originalCheckAnswer = checkAnswer;
-
-window.onload = function () {
-    const initDataUnsafe = TelegramGameProxy.initParams; // optional, contains user info
-    console.log("Game started from Telegram", initDataUnsafe);
-};

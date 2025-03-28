@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Phaser Game</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <!-- Подключаем Telegram Web App API -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add Phaser from CDN as fallback -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.88.2/dist/phaser.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -120,6 +124,38 @@
     </div>
     
     <script>
+        // Функция для инициализации Telegram Game
+        window.gameInitCallback = function() {
+            console.log("Game initialized via Telegram callback");
+            if (window.TelegramGameProxy) {
+                console.log("TelegramGameProxy detected");
+                
+                // Сохраняем параметры инициализации
+                window.gameParams = window.TelegramGameProxy.initParams || {};
+                console.log("Game params:", window.gameParams);
+                
+                // Сообщаем Telegram, что игра загружена
+                if (window.TelegramGameProxy.postEvent) {
+                    window.TelegramGameProxy.postEvent("GAME_LOADED", {}, true);
+                    console.log("Posted GAME_LOADED event to Telegram");
+                }
+            } else {
+                console.log("TelegramGameProxy not detected, running in standalone mode");
+            }
+        };
+        
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            // Запускаем инициализацию Telegram Game
+            window.gameInitCallback();
+            
+            // Проверка на мобильное устройство для адаптации
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                console.log("Mobile device detected, adjusting layout");
+                document.body.classList.add('mobile-device');
+            }
+        });
+    
         // Force the game to work with level progression
         window.addEventListener('load', function() {
             // This will run after all scripts have loaded
@@ -180,7 +216,8 @@
             }, 1000);
         });
     </script>
-    <!-- Changed from type="module" to make it work with the build system -->
+    
+    <!-- Try the direct game.js first -->
     <script type="module" src="./game.js"></script>
 </body>
 </html>
