@@ -167,7 +167,6 @@
                 };
                 
                 // Make the checkAnswer function accessible globally
-                const originalCheckAnswer = window.checkAnswer;
                 window.checkAnswer = function() {
                     console.log("Global checkAnswer called");
                     if (typeof originalCheckAnswer === 'function') {
@@ -181,6 +180,7 @@
             }, 1000);
         });
     </script>
-    <script type="module" src="game.js"></script>
+    <!-- Changed from type="module" to make it work with the build system -->
+    <script type="module" src="./game.js"></script>
 </body>
 </html>

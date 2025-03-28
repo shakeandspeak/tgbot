@@ -1,6 +1,73 @@
 // This line is correctly importing Phaser as an ES module
 import Phaser from 'phaser';
 
+// Add a console log to track when the game module loads
+console.log('Game module loaded! Phaser version:', Phaser.VERSION);
+
+// Function to preload assets using Image constructor and root-relative paths
+function preloadAssets() {
+  console.log('Preloading assets with root-relative paths...');
+  
+  // List of all image assets to preload
+  const imagesToLoad = [
+    '/countryside.png',
+    '/platform.png',
+    '/player-sprite.png',
+    '/enemy-sprite.png',
+    '/enemy-sprite2.png',
+    '/enemy-sprite3.png'
+  ];
+  
+  // Create a promise for each image to load
+  const imagePromises = imagesToLoad.map(src => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        console.log(`Successfully loaded: ${src}`);
+        resolve(img);
+      };
+      img.onerror = () => {
+        console.error(`Failed to load: ${src}`);
+        // Resolve anyway to prevent blocking the game
+        resolve(null);
+      };
+      img.src = src;
+    });
+  });
+  
+  // Also load the questions file
+  const questionsPromise = fetch('/english_game_questions.txt')
+    .then(response => {
+      if (!response.ok) {
+        console.error('Failed to load questions file');
+        return null;
+      }
+      console.log('Successfully loaded questions file');
+      return response.text();
+    })
+    .catch(error => {
+      console.error('Error loading questions file:', error);
+      return null;
+    });
+  
+  // Return a promise that resolves when all assets are loaded
+  return Promise.all([...imagePromises, questionsPromise])
+    .then(results => {
+      // The last result is the questions text
+      const questionsText = results[results.length - 1];
+      
+      // Process questions text if available
+      if (questionsText) {
+        console.log('Questions text loaded, length:', questionsText.length);
+        // Store for later use
+        window.preloadedQuestionsText = questionsText;
+      }
+      
+      console.log('All assets preloaded successfully');
+      return results;
+    });
+}
+
 // Game configuration with responsive scaling
 const config = {
     type: Phaser.AUTO,
@@ -25,13 +92,22 @@ const config = {
     }
 };
 
-// Initialize the game
+// Initialize the game only after assets are preloaded
 let game;
 
 // Wait for DOM to be fully loaded before starting the game
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM fully loaded, initializing game');
-    game = new Phaser.Game(config);
+    console.log('DOM fully loaded, preloading assets before initializing game');
+    
+    // First preload assets, then initialize the game
+    preloadAssets().then(() => {
+        console.log('Assets preloaded, initializing game');
+        game = new Phaser.Game(config);
+    }).catch(error => {
+        console.error('Error during asset preloading:', error);
+        // Initialize game anyway to show at least something
+        game = new Phaser.Game(config);
+    });
 });
 
 // Game variables
@@ -136,16 +212,22 @@ function selectQuestionsForLevel(level) {
 }
 
 function preload() {
-    // Load images
-    this.load.image('background', 'countryside.png');
-    this.load.image('ground', 'platform.png');
-    this.load.image('player', 'player-sprite.png');
-    this.load.image('enemy', 'enemy-sprite.png');
-    this.load.image('enemy-sprite2', 'enemy-sprite2.png');
-    this.load.image('enemy-sprite3', 'enemy-sprite3.png');
+    // Load images with root-relative paths in Phaser
+    this.load.image('background', '/countryside.png');
+    this.load.image('ground', '/platform.png');
+    this.load.image('player', '/player-sprite.png');
+    this.load.image('enemy', '/enemy-sprite.png');
+    this.load.image('enemy-sprite2', '/enemy-sprite2.png');
+    this.load.image('enemy-sprite3', '/enemy-sprite3.png');
     
-    // Immediately load questions file during preload phase
-    this.load.text('questions', 'english_game_questions.txt');
+    // If questions were preloaded, use that data instead of loading again
+    if (window.preloadedQuestionsText) {
+        console.log("Using preloaded questions data");
+        this.cache.text.add('questions', window.preloadedQuestionsText);
+    } else {
+        console.log("Questions not preloaded, loading directly");
+        this.load.text('questions', '/english_game_questions.txt');
+    }
 }
 
 function create() {
@@ -1236,3 +1318,6 @@ function resetForNextEnemy(scene, isCheatCode = false) {
         }, 500);
     }, 2000);
 }
+
+// Expose the checkAnswer function to the global scope for GitHub Pages compatibility
+window.originalCheckAnswer = checkAnswer;
