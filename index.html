@@ -119,6 +119,68 @@
         </div>
     </div>
     
+    <script>
+        // Force the game to work with level progression
+        window.addEventListener('load', function() {
+            // This will run after all scripts have loaded
+            setTimeout(function() {
+                // This fixes issues with the input not working properly
+                window.fixInputEventHandlers = function() {
+                    console.log("Force-fixing input handlers");
+                    
+                    // Recreate submit button event listener
+                    const submitBtn = document.getElementById('submit-btn');
+                    if (submitBtn) {
+                        // Clone to remove all event listeners
+                        const newSubmitBtn = submitBtn.cloneNode(true);
+                        submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
+                        
+                        // Add fresh event listener
+                        newSubmitBtn.addEventListener('click', function() {
+                            console.log("Button clicked via direct handler");
+                            // Call checkAnswer directly
+                            window.checkAnswer();
+                        });
+                    }
+                    
+                    // Recreate answer input event listener
+                    const answerInput = document.getElementById('answer-input');
+                    if (answerInput) {
+                        // Clone to remove all event listeners
+                        const newAnswerInput = answerInput.cloneNode(true);
+                        answerInput.parentNode.replaceChild(newAnswerInput, answerInput);
+                        
+                        // Add fresh event listener
+                        newAnswerInput.addEventListener('keypress', function(e) {
+                            if (e.key === 'Enter') {
+                                console.log("Enter key pressed via direct handler");
+                                // Call checkAnswer directly
+                                window.checkAnswer();
+                            }
+                        });
+                        
+                        // Focus on the input
+                        setTimeout(function() {
+                            newAnswerInput.focus();
+                        }, 100);
+                    }
+                };
+                
+                // Make the checkAnswer function accessible globally
+                const originalCheckAnswer = window.checkAnswer;
+                window.checkAnswer = function() {
+                    console.log("Global checkAnswer called");
+                    if (typeof originalCheckAnswer === 'function') {
+                        originalCheckAnswer();
+                    } else if (window.game) {
+                        // Try to find the function in the game context
+                        console.log("Trying to call checkAnswer from game");
+                        // This is a fallback in case the function isn't properly exposed
+                    }
+                };
+            }, 1000);
+        });
+    </script>
     <script type="module" src="game.js"></script>
 </body>
 </html>
